@@ -119,9 +119,18 @@ let DeterminePC bit =
 
 [<EntryPoint>]
 let main argv = 
-    let byte = 128
+    let byte = 97
+    
     let twoMostSignificantBits = byte >>> 6
     let Class = DetermineClass twoMostSignificantBits
+    
+    let bit678 = byte >>> 5 
+    let bit6 = 
+    let PC = DeterminePC bit6
+    
+    let bit5To0 = byte
+
     printfn "%A" Class
     System.Console.ReadKey() |> ignore
     0 
+
