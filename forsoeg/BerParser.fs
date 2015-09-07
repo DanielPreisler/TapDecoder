@@ -49,6 +49,11 @@ let parsePC (identifierByte : byte) =
 //    | 16 -> Sequence
 //    | 31 -> UseLongForm
 
+
+
+
+
+
     
 let parseUniversalContent bytes =
     (123 ,345) 
@@ -148,69 +153,111 @@ let parseBerInfo bytes startIndex =
     let endIndexOfThisObject = startIndexOfDataOctets + numberOfDataOctets
     (applicationTag, startIndexOfDataOctets, endIndexOfThisObject) 
 
-let parseBatchControlInfo bytes startIndex =
-    let (applicationTag, senderDataOctetsStartIndex, senderEndIndex) = parseBerInfo bytes startIndex
-    if applicationTag <> 196 //Sender
-    then failwith "Wrong application tag in batch control info"
-    else
-        let theString = System.Text.Encoding.ASCII.GetString(List.toArray(getBytes bytes senderDataOctetsStartIndex senderEndIndex))
-        let (applicationTag, recipientDataOctetStartIndex, recipientEndIndex) = parseBerInfo bytes senderDataOctetsStartIndex        
-        (BatchControlInfo, senderEndIndex)
+//
+//type ApplicationTagId = int
+//
+//type ApplicationTag = string
 
-let parseAccountingInfo bytes startIndex  =
-    let (applicationTag, accountingInfoDataOctetsStartIndex, accountingInfoEndIndex) = parseBerInfo bytes startIndex
-    if applicationTag <> 5 //AccountingInfo
-    then failwith "Wrong application tag in batch control info"
-    else (AccountingInfo, accountingInfoEndIndex)
+type Tap =
+    | None 
+    | Node of int * string * Tap list
+    | StringLeaf of string
+    | IntLeaf of int
+    | FloatLeaf of float
+    | DateLeaf of DateTime
 
-let parseNetworkInfo bytes startIndex =
-    let (applicationTag, nextStartIndex, networkInfoEndIndex) = parseBerInfo bytes startIndex
-    if  enum<ApplicationTags>(applicationTag) <> ApplicationTags.NetworkInfoTag 
-    then failwith "Wrong application tag in networkInfo"
-    else 
-        let networkInfoChoiceList = [(UtcTimeOffsetInfoList, RecEntityInfoList)]
-        (NetworkInfo(networkInfoChoiceList), networkInfoEndIndex)
+let rec decode bytes startIndex =
+     let (applicationTagId, nextStartIndex, endIndexOfThisTap) = parseBerInfo bytes startIndex
+     if nextStartIndex = endIndexOfThisTap
+     then ([], endIndexOfThisTap)
+     else // Handle each element on this level
+        let (aTapElementFromThisLevel, startIndexOfNextTapOnThisLevel) = 
+            match applicationTagId with
+            |2 -> (None, endIndexOfThisTap)
+            |4 -> (None, endIndexOfThisTap)
+            |5 -> (None, endIndexOfThisTap)
+            |6 -> (None, endIndexOfThisTap)
+            |16 -> (StringLeaf("LocalTimeOffset"), endIndexOfThisTap) // 14 bytes
+            |110 -> (StringLeaf("FileTypeIndicator"), endIndexOfThisTap)
+            |129 -> (IntLeaf(129), endIndexOfThisTap)
+            |163 -> (StringLeaf("OperatorSpecInformation"), endIndexOfThisTap)
+            |182 -> (StringLeaf("Recipient"), endIndexOfThisTap) // 5 bytes
+            |189 -> (IntLeaf(189), endIndexOfThisTap)
+            |196 -> (StringLeaf("Sender"), endIndexOfThisTap)    // 5 bytes
+            |201 -> (IntLeaf(201), endIndexOfThisTap)
+            |231 -> (StringLeaf("UtcTimeOffset"), endIndexOfThisTap) //5 bytes
+            |261 -> (StringLeaf("This is a leeeeeaaafe"), endIndexOfThisTap) // 1 - 63 bytes...
+            |_ ->   let (theNestedTapList, endIndexOfThisNestedTapElement) = decode bytes nextStartIndex
+                    (Node(applicationTagId, "SomeApplicationTag", theNestedTapList), endIndexOfThisNestedTapElement)
+        let (theNextElementOnThisLevel, endIndexOfThisLevel) = decode bytes startIndexOfNextTapOnThisLevel
+        (aTapElementFromThisLevel::theNextElementOnThisLevel, endIndexOfThisLevel)
 
-let parseMessageDescriptionInfo bytes startIndex =
-    let (applicationTag, nextStartIndex, messageDescriptionInfoEndIndex) = parseBerInfo bytes startIndex
-    if applicationTag <> 8 //MessageDescriptionInfo
-    then 
-        failwith "Wrong application tag in MessageDescriptionInfo"
-    else 
-        (MessageDescriptionInfo, messageDescriptionInfoEndIndex)
+         
+//let parseBatchControlInfo bytes startIndex =
+//    let (applicationTag, senderDataOctetsStartIndex, senderEndIndex) = parseBerInfo bytes startIndex
+//    if applicationTag <> 196 //Sender
+//    then failwith "Wrong application tag in batch control info"
+//    else
+//        let theString = System.Text.Encoding.ASCII.GetString(List.toArray(getBytes bytes senderDataOctetsStartIndex senderEndIndex))
+//        let (applicationTag, recipientDataOctetStartIndex, recipientEndIndex) = parseBerInfo bytes senderDataOctetsStartIndex        
+//        (BatchControlInfo, senderEndIndex)
+//
+//let parseAccountingInfo bytes startIndex  =
+//    let (applicationTag, accountingInfoDataOctetsStartIndex, accountingInfoEndIndex) = parseBerInfo bytes startIndex
+//    if applicationTag <> 5 //AccountingInfo
+//    then failwith "Wrong application tag in batch control info"
+//    else (AccountingInfo, accountingInfoEndIndex)
+//
+//let parseNetworkInfo bytes startIndex =
+//    let (applicationTag, nextStartIndex, networkInfoEndIndex) = parseBerInfo bytes startIndex
+//    if  enum<ApplicationTags>(applicationTag) <> ApplicationTags.NetworkInfoTag 
+//    then failwith "Wrong application tag in networkInfo"
+//    else 
+//        let networkInfoChoiceList = [(UtcTimeOffsetInfoList, RecEntityInfoList)]
+//        (NetworkInfo(networkInfoChoiceList), networkInfoEndIndex)
+//
+//let parseMessageDescriptionInfo bytes startIndex =
+//    let (applicationTag, nextStartIndex, messageDescriptionInfoEndIndex) = parseBerInfo bytes startIndex
+//    if applicationTag <> 8 //MessageDescriptionInfo
+//    then 
+//        failwith "Wrong application tag in MessageDescriptionInfo"
+//    else 
+//        (MessageDescriptionInfo, messageDescriptionInfoEndIndex)
+//
+//let parseCallEventDetails bytes startIndex =
+//    let (applicationTag, nextStartIndex, callEventDetailsEndIndex) = parseBerInfo bytes startIndex
+//    (CallEventDetails([CallEventDetail(MobileOriginatedCall(DateTime.UtcNow, "MobileOriginatedCall"))]), callEventDetailsEndIndex)
+//
+//let parseAuditControlInfo bytes startIndex =
+//    let (applicationTag, nextStartIndex, auditControlInfoEndIndex) = parseBerInfo bytes startIndex
+//    (AuditControlInfo, auditControlInfoEndIndex)
 
-let parseCallEventDetails bytes startIndex =
-    let (applicationTag, nextStartIndex, callEventDetailsEndIndex) = parseBerInfo bytes startIndex
-    (CallEventDetails([CallEventDetail(MobileOriginatedCall(DateTime.UtcNow, "MobileOriginatedCall"))]), callEventDetailsEndIndex)
+//let parseTransferBatch bytes startIndex endIndex =
+//    let (applicationTag, batchControlDataOctetsStartIndex, accountingInfoStartIndex) = parseBerInfo bytes startIndex
+//    if applicationTag = BatchControlInfoTag
+//    then 
+//        let (batchControlInfo, _)                                = parseBatchControlInfo       bytes batchControlDataOctetsStartIndex 
+//    else
+//    let (accountingInfo, networkInfoStartIndex)              = parseAccountingInfo         bytes accountingInfoStartIndex 
+//    let (networkInfo, messageDescriptionInfoStartIndex)      = parseNetworkInfo            bytes networkInfoStartIndex 
+//    let (messageDescriptionInfo, callEventDetailsStartIndex) = parseMessageDescriptionInfo bytes messageDescriptionInfoStartIndex
+//    let (callEventDetails, auditControlInfoStartIndex)       = parseCallEventDetails       bytes callEventDetailsStartIndex 
+//    let (auditControlInfo, _)                                = parseAuditControlInfo       bytes auditControlInfoStartIndex
+//    TransferBatch(batchControlInfo, accountingInfo, networkInfo, messageDescriptionInfo, callEventDetails, auditControlInfo)
+//
+//let parseNotification bytes startIndex endIndex = 
+//    let (applicationTag, nextStartIndex, nextEndIndex) = parseBerInfo bytes startIndex
+//    Notification("Notification")
+//
+//let parseDataInterchange bytes =
+//    let startIndex = 0
+//    let (applicationTag, nextStartIndex, nextEndIndex) = parseBerInfo bytes startIndex
+//    match applicationTag with
+//    |1 -> DataInterchange (parseTransferBatch bytes nextStartIndex nextEndIndex)
+//    |2 -> DataInterchange (parseNotification bytes nextStartIndex nextEndIndex)
+//    |_ -> failwith "Error passing ApplicationContent"
 
-let parseAuditControlInfo bytes startIndex =
-    let (applicationTag, nextStartIndex, auditControlInfoEndIndex) = parseBerInfo bytes startIndex
-    (AuditControlInfo, auditControlInfoEndIndex)
 
-let parseTransferBatch bytes startIndex endIndex =
-    let (applicationTag, batchControlDataOctetsStartIndex, accountingInfoStartIndex) = parseBerInfo bytes startIndex
-    if applicationTag = BatchControlInfoTag
-    then 
-        let (batchControlInfo, _)                                = parseBatchControlInfo       bytes batchControlDataOctetsStartIndex 
-    else
-    let (accountingInfo, networkInfoStartIndex)              = parseAccountingInfo         bytes accountingInfoStartIndex 
-    let (networkInfo, messageDescriptionInfoStartIndex)      = parseNetworkInfo            bytes networkInfoStartIndex 
-    let (messageDescriptionInfo, callEventDetailsStartIndex) = parseMessageDescriptionInfo bytes messageDescriptionInfoStartIndex
-    let (callEventDetails, auditControlInfoStartIndex)       = parseCallEventDetails       bytes callEventDetailsStartIndex 
-    let (auditControlInfo, _)                                = parseAuditControlInfo       bytes auditControlInfoStartIndex
-    TransferBatch(batchControlInfo, accountingInfo, networkInfo, messageDescriptionInfo, callEventDetails, auditControlInfo)
-
-let parseNotification bytes startIndex endIndex = 
-    let (applicationTag, nextStartIndex, nextEndIndex) = parseBerInfo bytes startIndex
-    Notification("Notification")
-
-let parseDataInterchange bytes =
-    let startIndex = 0
-    let (applicationTag, nextStartIndex, nextEndIndex) = parseBerInfo bytes startIndex
-    match applicationTag with
-    |1 -> DataInterchange (parseTransferBatch bytes nextStartIndex nextEndIndex)
-    |2 -> DataInterchange (parseNotification bytes nextStartIndex nextEndIndex)
-    |_ -> failwith "Error passing ApplicationContent"
 
 
 //let parse (bytes : byte list) =

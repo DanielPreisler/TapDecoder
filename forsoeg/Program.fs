@@ -60,7 +60,7 @@ let main argv =
 
     let testBytes = [(byte)97;(byte)54]
 
-    let result = parseDataInterchange allBytesInFile
+    //let result = parseDataInterchange allBytesInFile
 
     let theClassIsUniversal = parseClass((byte)63) = Universal
     let theClassIsApplication = parseClass((byte)64) = Application
@@ -88,5 +88,8 @@ let main argv =
     let theApplicationTagFromTwoBytes258 = actualValue = (16384, 4)  
 //    let carsten = parseDataInterChange 5
 //    let bois = carsten
+ 
+    let blaa = decode allBytesInFile 0
+    
     0 // return an integer exit code
 
